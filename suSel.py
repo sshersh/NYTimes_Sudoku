@@ -3,6 +3,7 @@ import time
 import sys
 
 # solves and fills in nytimes sudoku
+# scrolling or moving mouse excessively may interfere with solving process
 # possible command line arguments:
 #   -easy           solve easy nytimes sudoku
 #   -medium         solve medium difficulty nytimes sudoku
@@ -45,6 +46,7 @@ class SudokuNYT:
         board = driver.find_element_by_css_selector(r"div.su-board")
         cssString = "div"
         for row in range(0,9):
+            currentCell = None
             for col in range(0,9):
                 currentCell = board.find_element_by_css_selector(cssString)
                 currentVal = currentCell.get_attribute("aria-label")
@@ -58,10 +60,11 @@ class SudokuNYT:
                     self.knowns.append((row,col))
                 cssString += "+div"
             if row == 8:
+                currentCell.click()
                 break
             self.sudoku.append([])
             self.nyt.append([])
-
+            
 
     def _nextNum(self,ind):
         """finds the next valid number for index \'ind\' of the unknown squares"""
@@ -138,18 +141,14 @@ class SudokuNYT:
         print('\n' * 3)
 
     def fillNum(self, ind, num):
-        driver.implicitly_wait(0.1)
         row = self.unknowns[ind][0]
         col = self.unknowns[ind][1]
-        if not ind == 0:
-            self.nyt[row][col].click()
-        driver.implicitly_wait(0.1)
+        self.nyt[row][col].click()
         self.keys[num-1].click()
 
     def delNum(self, ind):
         row = self.unknowns[ind][0]
         col = self.unknowns[ind][1]
-        driver.implicitly_wait(0.1)
         self.nyt[row][col].click()
         delete.click()
 
