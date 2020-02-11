@@ -2,30 +2,20 @@ from selenium import webdriver
 import time
 import sys
 
-# solves and fills in nytimes sudoku
+# class to extract, solve and fill in nytimes sudoku
 # scrolling or moving mouse excessively may interfere with solving process
-# possible command line arguments:
-#   -easy           solve easy nytimes sudoku
-#   -medium         solve medium difficulty nytimes sudoku
-#   -hard           solve hard nytimes sudoku
-
-if len(sys.argv) == 1:
-    url = r"https://www.nytimes.com/puzzles/sudoku/easy"
-else:
-    diff = sys.argv[1]
-    while not diff in ["-easy","-medium","-hard"]:
-        diff = input("Specify either '-easy', '-medium' or '-hard'")
-    url = r"https://www.nytimes.com/puzzles/sudoku/" + diff[1:]
+# must have matching versions of selenium, chromedriver and chrome/chromium installed
+# for medium or hard sudokus, initalialize sudoku with "medium" or "hard"
+# to mute display of solving process (much faster), call solve() with quiet=True
+# to overwrite wrong values instead of deleting them, call solve() with noDelete=True
 
 options = webdriver.ChromeOptions()
 options.add_argument('--ignore-certificate-errors')
 options.add_argument('--ignore-ssl-errors')
-driver = webdriver.Chrome(r"C:\Users\sam\Documents\sudokuProj\chromedriver.exe", options = options)
-driver.get(url)
-delete = driver.find_element_by_css_selector(r"div.su-keyboard div.su-keyboard__delete")
 
 class SudokuNYT:
-    def __init__(self):
+    def __init__(self, diff="easy"):
+        """navigates to easy, medium or hard nytimes sudoku and extracts knowns and keypad"""
         self.nyt = [[]]
         self.sudoku = [[]]
         self.knowns = []
@@ -33,7 +23,9 @@ class SudokuNYT:
         self.keys = []
         # configure chromedriver
 
-
+        driver = webdriver.Chrome(r"C:\Users\sam\Documents\sudokuProj\chromedriver.exe", options = options)
+        driver.get(r"https://www.nytimes.com/puzzles/sudoku/" + diff)
+        self.delete = driver.find_element_by_css_selector(r"div.su-keyboard div.su-keyboard__delete")
         # open chromedriver and navigate to nytimes sudoku
         driver.implicitly_wait(5)
         # get the keypad and put into keys list
@@ -64,7 +56,7 @@ class SudokuNYT:
                 break
             self.sudoku.append([])
             self.nyt.append([])
-            
+
 
     def _nextNum(self,ind):
         """finds the next valid number for index \'ind\' of the unknown squares"""
@@ -74,7 +66,8 @@ class SudokuNYT:
         #there's no other number that will work
         if self.sudoku[r][c] == 9:
             self.sudoku[r][c] = 0
-            self.delNum(ind)
+            if not self.quiet and not self.noDelete:
+                self._delNum(ind)
             return False
         #important to exclude current index from col (python makes shallow copy)
         col = [self.sudoku[x][c] for x in range(0,9) if x != r]
@@ -100,15 +93,17 @@ class SudokuNYT:
         #this means no number satisfying constraints has been found - return False
         if self.sudoku[r][c] == 10:
             self.sudoku[r][c] = 0
-            self.delNum(ind)
+            if not self.quiet and not self.noDelete:
+                self._delNum(ind)
             return False
         #otherwise, return true
         else:
-            self.fillNum(ind,self.sudoku[r][c])
+            if not self.quiet:
+                self._fillNum(ind,self.sudoku[r][c])
             return True
 
     def _guess(self,it):
-        """recursively solves the sudoku by backtracking."""
+        """solves the sudoku by recursively backtracking."""
         #in this case the sudoku has been solved
         if it == len(self.unknowns):
            return True
@@ -121,16 +116,22 @@ class SudokuNYT:
             flag = self._guess(it+1)
         return flag
 
-    def solve(self):
+    def solve(self, quiet=False, noDelete=False):
         """driver for guess method"""
+        self.quiet = quiet
+        self.noDelete = noDelete
         endVal = self._guess(0)
         if endVal:
+            if self.quiet:
+                self._fillSudoku()
             time.sleep(2)
+            self.driver.quit()
             # print("Sudoku solved!")
         else:
             print("Sudoku not solved.")
 
     def printSudoku(self):
+        """simple method for printing list to command line (fastest)"""
         for row in range(0,9):
             for col in range(0,9):
                 if (row,col) in self.unknowns and self.sudoku[row][col] != 0:
@@ -140,25 +141,24 @@ class SudokuNYT:
             print("\n")
         print('\n' * 3)
 
-    def fillNum(self, ind, num):
+    def _fillNum(self, ind, num):
+        """fill in a number in cell specified by ind"""
         row = self.unknowns[ind][0]
         col = self.unknowns[ind][1]
         self.nyt[row][col].click()
         self.keys[num-1].click()
 
-    def delNum(self, ind):
+    def _delNum(self, ind):
+        """delete a number in cell specified by ind"""
         row = self.unknowns[ind][0]
         col = self.unknowns[ind][1]
         self.nyt[row][col].click()
-        delete.click()
+        self.delete.click()
 
-    # def fillSudoku(self):
-    #     for ind in self.unknowns:
-    #         r = ind[0]
-    #         c = ind[1]
-    #         self.fillNum(r,c,self.sudoku[r][c])
-    #     time.sleep(2)
-
-s = SudokuNYT()
-s.solve()
-driver.quit()
+    def _fillSudoku(self):
+        """fill in whole sudoku (for quiet mode)"""
+        for ind in range(0, len(self.unknowns)):
+            r = self.unknowns[ind][0]
+            c = self.unknowns[ind][1]
+            self._fillNum(ind, self.sudoku[r][c])
+        time.sleep(2)
