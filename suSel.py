@@ -21,21 +21,22 @@ class SudokuNYT:
         self.knowns = []
         self.unknowns = []
         self.keys = []
+        self.cands = [[]]
         # configure chromedriver
 
-        driver = webdriver.Chrome(r"C:\Users\sam\Documents\sudokuProj\chromedriver.exe", options = options)
-        driver.get(r"https://www.nytimes.com/puzzles/sudoku/" + diff)
-        self.delete = driver.find_element_by_css_selector(r"div.su-keyboard div.su-keyboard__delete")
+        self.driver = webdriver.Chrome(r"C:\Users\sam\Documents\sudokuProj\chromedriver.exe", options = options)
+        self.driver.get(r"https://www.nytimes.com/puzzles/sudoku/" + diff)
+        self.delete = self.driver.find_element_by_css_selector(r"div.su-keyboard div.su-keyboard__delete")
         # open chromedriver and navigate to nytimes sudoku
-        driver.implicitly_wait(5)
+        self.driver.implicitly_wait(5)
         # get the keypad and put into keys list
-        keypad = driver.find_element_by_css_selector(r"div.su-keyboard")
+        keypad = self.driver.find_element_by_css_selector(r"div.su-keyboard")
         cssString = "div.su-keyboard__number"
         for nums in range(0,9):
             self.keys.append(keypad.find_element_by_css_selector(cssString))
             cssString += "+div"
         # time to make the board
-        board = driver.find_element_by_css_selector(r"div.su-board")
+        board = self.driver.find_element_by_css_selector(r"div.su-board")
         cssString = "div"
         for row in range(0,9):
             currentCell = None
@@ -57,6 +58,20 @@ class SudokuNYT:
             self.sudoku.append([])
             self.nyt.append([])
 
+    def _isConflict(self,row,col,num):
+        """determines if a value is impossible"""
+        #important to exclude current index from col (python makes shallow copy)
+        sameCol = [self.sudoku[x][col] for x in range(0,9) if x != row]
+        sameRow = self.sudoku[row][0:col] + self.sudoku[row][col+1:9]
+        #use floor division to find appropriate block
+        rowBlock = range(3*(row//3),3*(row//3 + 1))
+        colBlock = range(3*(col//3),3*(col//3 + 1))
+        block = [self.sudoku[ii][jj] for ii in rowBlock for jj in colBlock if ii != row or jj != col]
+
+        if num in sameRow or num in sameCol or num in block:
+            return True
+        else:
+            return False
 
     def _nextNum(self,ind):
         """finds the next valid number for index \'ind\' of the unknown squares"""
@@ -69,24 +84,10 @@ class SudokuNYT:
             if not self.quiet and not self.noDelete:
                 self._delNum(ind)
             return False
-        #important to exclude current index from col (python makes shallow copy)
-        col = [self.sudoku[x][c] for x in range(0,9) if x != r]
-        row = self.sudoku[r][0:c] + self.sudoku[r][c+1:9]
-        #use floor division to find appropriate block
-        rowBlock = range(3*(r//3),3*(r//3 + 1))
-        colBlock = range(3*(c//3),3*(c//3 + 1))
-        block = [self.sudoku[ii][jj] for ii in rowBlock for jj in colBlock if ii != r or jj != c]
 
         self.sudoku[r][c] += 1
         while self.sudoku[r][c] <= 9:
-            #check if current index is in current block, row and col
-            #if so, increase sudoku[r][c] and repeat until suitable number found
-            #or no number found
-            if self.sudoku[r][c] in block:
-                self.sudoku[r][c] += 1
-            elif self.sudoku[r][c] in row:
-                self.sudoku[r][c] += 1
-            elif self.sudoku[r][c] in col:
+            if self._isConflict(r, c, self.sudoku[r][c]):
                 self.sudoku[r][c] += 1
             else:
                 break
@@ -162,3 +163,6 @@ class SudokuNYT:
             c = self.unknowns[ind][1]
             self._fillNum(ind, self.sudoku[r][c])
         time.sleep(2)
+
+s = SudokuNYT("easy")
+s.solve()
