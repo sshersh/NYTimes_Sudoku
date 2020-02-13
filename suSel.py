@@ -1,6 +1,5 @@
 from selenium import webdriver
 import time
-import sys
 
 # class to extract, solve and fill in nytimes sudoku
 # scrolling or moving mouse excessively may interfere with solving process
@@ -30,18 +29,15 @@ class SudokuNYT:
         # open chromedriver and navigate to nytimes sudoku
         self.driver.implicitly_wait(5)
         # get the keypad and put into keys list
-        keypad = self.driver.find_element_by_css_selector(r"div.su-keyboard")
-        cssString = "div.su-keyboard__number"
-        for nums in range(0,9):
-            self.keys.append(keypad.find_element_by_css_selector(cssString))
-            cssString += "+div"
+        keypad = self.driver.find_element_by_css_selector(r"div.su-keyboard__container")
+        for nums in range(1,10):
+            self.keys.append(keypad.find_element_by_xpath("div[{}]".format(nums)))
         # time to make the board
         board = self.driver.find_element_by_css_selector(r"div.su-board")
-        cssString = "div"
         for row in range(0,9):
-            currentCell = None
             for col in range(0,9):
-                currentCell = board.find_element_by_css_selector(cssString)
+                cur = row*9 + col + 1
+                currentCell = board.find_element_by_xpath("div[{}]".format(cur))
                 currentVal = currentCell.get_attribute("aria-label")
                 if currentVal == "empty":
                     self.sudoku[row].append(0)
@@ -51,7 +47,6 @@ class SudokuNYT:
                     self.nyt[row].append(currentCell)
                     self.sudoku[row].append(int(currentVal))
                     self.knowns.append((row,col))
-                cssString += "+div"
             if row == 8:
                 currentCell.click()
                 break
@@ -163,6 +158,3 @@ class SudokuNYT:
             c = self.unknowns[ind][1]
             self._fillNum(ind, self.sudoku[r][c])
         time.sleep(2)
-
-s = SudokuNYT("easy")
-s.solve()
