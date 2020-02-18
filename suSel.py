@@ -1,4 +1,5 @@
 from selenium import webdriver
+from contextlib import contextmanager
 import time
 
 # class to extract, solve and fill in nytimes sudoku
@@ -6,14 +7,14 @@ import time
 # must have matching versions of selenium, chromedriver and chrome/chromium installed
 # for medium or hard sudokus, initalialize sudoku with "medium" or "hard"
 # to mute display of solving process (much faster), call solve() with quiet=True
-# to overwrite wrong values instead of deleting them, call solve() with noDelete=True
 
 options = webdriver.ChromeOptions()
 options.add_argument('--ignore-certificate-errors')
 options.add_argument('--ignore-ssl-errors')
 
+
 class SudokuNYT:
-    def __init__(self, diff="easy"):
+    def __init__(self,diff):
         """navigates to easy, medium or hard nytimes sudoku and extracts knowns and keypad"""
         self.nyt = [[]]
         self.sudoku = [[]]
@@ -21,13 +22,16 @@ class SudokuNYT:
         self.unknowns = []
         self.keys = []
         self.cands = [[]]
+        self.diff = diff
         # configure chromedriver
 
+    def __enter__(self):
         self.driver = webdriver.Chrome(r"C:\Users\sam\Documents\sudokuProj\chromedriver.exe", options = options)
-        self.driver.get(r"https://www.nytimes.com/puzzles/sudoku/" + diff)
+        self.driver.get(r"https://www.nytimes.com/puzzles/sudoku/" + self.diff)
+
         self.delete = self.driver.find_element_by_css_selector(r"div.su-keyboard div.su-keyboard__delete")
         # open chromedriver and navigate to nytimes sudoku
-        self.driver.implicitly_wait(5)
+        self.driver.implicitly_wait(0.1)
         # get the keypad and put into keys list
         keypad = self.driver.find_element_by_css_selector(r"div.su-keyboard__container")
         for nums in range(1,10):
@@ -53,6 +57,14 @@ class SudokuNYT:
             self.sudoku.append([])
             self.nyt.append([])
 
+        # return reference to self for the context manager
+        return self
+
+    def __exit__(self, exc_type, exc_value, tb):
+        if exc_type is not None:
+            traceback.print_exception(exc_type, exc_value, tb)
+        self.driver.quit()
+
     def _isConflict(self,row,col,num):
         """determines if a value is impossible"""
         #important to exclude current index from col (python makes shallow copy)
@@ -61,9 +73,9 @@ class SudokuNYT:
         #use floor division to find appropriate block
         rowBlock = range(3*(row//3),3*(row//3 + 1))
         colBlock = range(3*(col//3),3*(col//3 + 1))
-        block = [self.sudoku[ii][jj] for ii in rowBlock for jj in colBlock if ii != row or jj != col]
+        sameBlock = [self.sudoku[ii][jj] for ii in rowBlock for jj in colBlock if ii != row or jj != col]
 
-        if num in sameRow or num in sameCol or num in block:
+        if num in sameRow or num in sameCol or num in sameBlock:
             return True
         else:
             return False
@@ -76,8 +88,7 @@ class SudokuNYT:
         #there's no other number that will work
         if self.sudoku[r][c] == 9:
             self.sudoku[r][c] = 0
-            if not self.quiet and not self.noDelete:
-                self._delNum(ind)
+            self._delNum(ind)
             return False
 
         self.sudoku[r][c] += 1
@@ -89,8 +100,7 @@ class SudokuNYT:
         #this means no number satisfying constraints has been found - return False
         if self.sudoku[r][c] == 10:
             self.sudoku[r][c] = 0
-            if not self.quiet and not self.noDelete:
-                self._delNum(ind)
+            self._delNum(ind)
             return False
         #otherwise, return true
         else:
@@ -112,17 +122,15 @@ class SudokuNYT:
             flag = self._guess(it+1)
         return flag
 
-    def solve(self, quiet=False, noDelete=False):
+    def solve(self, quiet=False):
         """driver for guess method"""
         self.quiet = quiet
-        self.noDelete = noDelete
         endVal = self._guess(0)
         if endVal:
             if self.quiet:
                 self._fillSudoku()
-            time.sleep(2)
-            self.driver.quit()
-            # print("Sudoku solved!")
+            print("Sudoku solved!")
+            self.solved = True
         else:
             print("Sudoku not solved.")
 
@@ -139,6 +147,7 @@ class SudokuNYT:
 
     def _fillNum(self, ind, num):
         """fill in a number in cell specified by ind"""
+        self.driver.implicitly_wait(0.01)
         row = self.unknowns[ind][0]
         col = self.unknowns[ind][1]
         self.nyt[row][col].click()
@@ -146,10 +155,12 @@ class SudokuNYT:
 
     def _delNum(self, ind):
         """delete a number in cell specified by ind"""
-        row = self.unknowns[ind][0]
-        col = self.unknowns[ind][1]
-        self.nyt[row][col].click()
-        self.delete.click()
+        if not self.quiet:
+            self.driver.implicitly_wait(0.01)
+            row = self.unknowns[ind][0]
+            col = self.unknowns[ind][1]
+            self.nyt[row][col].click()
+            self.delete.click()
 
     def _fillSudoku(self):
         """fill in whole sudoku (for quiet mode)"""
@@ -158,3 +169,16 @@ class SudokuNYT:
             c = self.unknowns[ind][1]
             self._fillNum(ind, self.sudoku[r][c])
         time.sleep(2)
+
+
+def sudoku(diff="easy",q=False):
+    while(not diff in ["easy","medium","hard"]):
+        diff = input("Enter a difficulty ('easy','medium', or 'hard')")
+
+    str = """_____________________________
+to solve, type 's' or 'solve': """
+    with SudokuNYT(diff) as su:
+        s = input(str)
+        while(not s in ['s','solve']):
+            s = input(str)
+        su.solve(quiet=q)
