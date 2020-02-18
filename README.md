@@ -3,4 +3,3 @@ Solving NYTimes puzzles with Python and Selenium
 
 Uses a backtracking algorithm + Selenium to extract daily easy, medium or hard sudoku from NYTimes website and solve, 
 directly on the sudoku page.
-The solving process is displayed by default but for much faster results run solve(quiet = True)
