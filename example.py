@@ -4,7 +4,7 @@ import suSel as su
 # context manager ensures there are no processes left running after calling sudoku()
 
 # solve an easy sudoku
-su.sudoku("easy",True)
+su.sudoku("easy")
 
 # solve a medium sudoku with the quiet setting (dramatically speeds performance)
 su.sudoku("medium",True)
