@@ -2,16 +2,17 @@ from selenium import webdriver
 from contextlib import contextmanager
 import time
 
-# class to extract, solve and fill in nytimes sudoku
-# scrolling or moving mouse excessively may interfere with solving process
+# class to solve and fill in New York Times sudokus
+# scrolling or moving mouse excessively can through the solver off track
 # must have matching versions of selenium, chromedriver and chrome/chromium installed
 # for medium or hard sudokus, initalialize sudoku with "medium" or "hard"
-# to mute display of solving process (much faster), call solve() with quiet=True
+# to turn off solving visualization (much faster), call solve() with quiet=True
 
 options = webdriver.ChromeOptions()
 options.add_argument('--ignore-certificate-errors')
 options.add_argument('--ignore-ssl-errors')
-
+#options.binary_location = "C:/Program Files (x86)/Google/Chrome Beta/Application"
+PATH_TO_CHROMEDRIVER = "C:/Users/sam/Anaconda3/pkgs/chromedriver_win32 (1)/chromedriver.exe"
 
 class SudokuNYT:
     def __init__(self,diff):
@@ -26,7 +27,7 @@ class SudokuNYT:
         # configure chromedriver
 
     def __enter__(self):
-        self.driver = webdriver.Chrome(r"C:\Users\sam\Documents\sudokuProj\chromedriver.exe", options = options)
+        self.driver = webdriver.Chrome(PATH_TO_CHROMEDRIVER, options = options)
         self.driver.get(r"https://www.nytimes.com/puzzles/sudoku/" + self.diff)
 
         self.delete = self.driver.find_element_by_css_selector(r"div.su-keyboard div.su-keyboard__delete")
@@ -109,7 +110,7 @@ class SudokuNYT:
             return True
 
     def _guess(self,it):
-        """solves the sudoku by recursively backtracking."""
+        """solves the sudoku by backtracking."""
         #in this case the sudoku has been solved
         if it == len(self.unknowns):
            return True
@@ -135,7 +136,8 @@ class SudokuNYT:
             print("Sudoku not solved.")
 
     def printSudoku(self):
-        """simple method for printing list to command line (fastest)"""
+        """simple utility for printing list to command line.
+        Unknowns are marked with an asterisk *"""
         for row in range(0,9):
             for col in range(0,9):
                 if (row,col) in self.unknowns and self.sudoku[row][col] != 0:
@@ -175,10 +177,10 @@ def sudoku(diff="easy",q=False):
     while(not diff in ["easy","medium","hard"]):
         diff = input("Enter a difficulty ('easy','medium', or 'hard')")
 
-    str = """_____________________________
-to solve, type 's' or 'solve': """
+#     str = """_____________________________
+# to solve, type 's' or 'solve': """
     with SudokuNYT(diff) as su:
-        s = input(str)
-        while(not s in ['s','solve']):
-            s = input(str)
+        # s = input(str)
+        # while(not s in ['s','solve']):
+        #     s = input(str)
         su.solve(quiet=q)
