@@ -1,8 +1,6 @@
 from selenium import webdriver
-from selenium.common.exceptions import *
 from contextlib import contextmanager
 import time
-import sys, traceback
 
 # class to solve and fill in New York Times sudokus
 # scrolling or moving mouse excessively can through the solver off track
@@ -62,14 +60,9 @@ class SudokuNYT:
         # return reference to self for the context manager
         return self
 
-    def __exit__(self, exc_type, exc_info, tb):
-        if exc_type in (KeyboardInterrupt, NoSuchWindowException, SystemExit):
-            raise
-            self.driver.quit()
+    def __exit__(self, exc_type, exc_value, tb):
         if exc_type is not None:
-            traceback.print_exception(exc_type, exc_info, tb)
-            self.driver.quit()
-            raise
+            traceback.print_exception(exc_type, exc_value, tb)
         self.driver.quit()
 
     def _isConflict(self,row,col,num):
@@ -88,16 +81,15 @@ class SudokuNYT:
             return False
 
 
-    def solve(self, display=False):
+    def solve(self, quiet=False):
         """driver for guess method"""
-        self.display = display
+        self.quiet = quiet
         endVal = self._guess(0)
         if endVal:
-            if not self.display:
+            if self.quiet:
                 self._fillSudoku()
             print("Sudoku solved!")
             self.solved = True
-            time.sleep(2)
         else:
             print("Sudoku not solved.")
 
@@ -113,17 +105,17 @@ class SudokuNYT:
             print("\n")
         print('\n' * 3)
 
-    def _fillNum(self, ind):
+    def _fillNum(self, ind, num):
         """fill in a number in cell specified by ind"""
         self.driver.implicitly_wait(0.01)
         row = self.unknowns[ind][0]
         col = self.unknowns[ind][1]
         self.nyt[row][col].click()
-        self.keys[self.sudoku[row][col]-1].click()
+        self.keys[num-1].click()
 
     def _delNum(self, ind):
         """delete a number in cell specified by ind"""
-        if self.display:
+        if not self.quiet:
             self.driver.implicitly_wait(0.01)
             row = self.unknowns[ind][0]
             col = self.unknowns[ind][1]
@@ -133,39 +125,39 @@ class SudokuNYT:
     def _fillSudoku(self):
         """fill in whole sudoku (for quiet mode)"""
         for ind in range(0, len(self.unknowns)):
-            self._fillNum(ind)
+            r = self.unknowns[ind][0]
+            c = self.unknowns[ind][1]
+            self._fillNum(ind, self.sudoku[r][c])
+        time.sleep(2)
 
 class SudokuBacktrack(SudokuNYT):
     def _nextNum(self,ind):
         """finds the next valid number for index 'ind' of the unknown squares."""
         r = self.unknowns[ind][0]
         c = self.unknowns[ind][1]
-
-        tempGuess = self.sudoku[r][c]
         #if current cell is already 9 and nextNum was called,
         #there's no other number that will work
-        if tempGuess == 9:
+        if self.sudoku[r][c] == 9:
             self.sudoku[r][c] = 0
             self._delNum(ind)
             return False
 
-        tempGuess += 1
-        while tempGuess <= 9:
-            if self._isConflict(r, c, tempGuess):
-                tempGuess += 1
+        self.sudoku[r][c] += 1
+        while self.sudoku[r][c] <= 9:
+            if self._isConflict(r, c, self.sudoku[r][c]):
+                self.sudoku[r][c] += 1
             else:
                 break
         #this means no number satisfying constraints has been found - return False
-        if tempGuess == 10:
-            #keep with the "0 = unknown" convention
+        if self.sudoku[r][c] == 10:
+            #keep with the "0 = unknown" convention, doesn't take much extra time
             self.sudoku[r][c] = 0
             self._delNum(ind)
             return False
-        #otherwise, fill in sudoku[r][c] and return true
+        #otherwise, return true
         else:
-            self.sudoku[r][c] = tempGuess
-            if self.display:
-                self._fillNum(ind)
+            if not self.quiet:
+                self._fillNum(ind,self.sudoku[r][c])
             return True
 
     def _guess(self,it):
@@ -192,13 +184,13 @@ class SudokuHuman(SudokuNYT):
     def _guess(self):
         pass
 
-def sudoku(diff="easy",display=True,mode="Backtrack"):
+def sudoku(diff="easy",q=False,mode="Backtrack"):
     while(not diff in ["easy","medium","hard"]):
         diff = input("Enter a difficulty ('easy','medium', or 'hard')")
 
     if (mode=="Backtrack"):
         with SudokuBacktrack(diff) as su:
-            su.solve(display=display)
+            su.solve(quiet=q)
     else:
         with SudokuHuman(diff) as su:
-            su.solve(display=d)
+            su.solve(quiet=q)
