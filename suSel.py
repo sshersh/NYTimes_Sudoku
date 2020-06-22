@@ -12,14 +12,13 @@ options = webdriver.ChromeOptions()
 options.add_argument('--ignore-certificate-errors')
 options.add_argument('--ignore-ssl-errors')
 #options.binary_location = "C:/Program Files (x86)/Google/Chrome Beta/Application"
-PATH_TO_CHROMEDRIVER = "C:/Users/sam/Anaconda3/pkgs/chromedriver_win32 (1)/chromedriver.exe"
+PATH_TO_CHROMEDRIVER = "C:/Users/sam/Anaconda3/pkgs/chromedriver_win32/chromedriver.exe"
 
 class SudokuNYT:
     def __init__(self,diff):
         """navigates to easy, medium or hard nytimes sudoku and extracts knowns and keypad"""
         self.nyt = [[]]
         self.sudoku = [[]]
-        self.knowns = []
         self.unknowns = []
         self.keys = []
         self.cands = [[]]
@@ -51,13 +50,13 @@ class SudokuNYT:
                 else:
                     self.nyt[row].append(currentCell)
                     self.sudoku[row].append(int(currentVal))
-                    self.knowns.append((row,col))
             if row == 8:
                 currentCell.click()
                 break
             self.sudoku.append([])
             self.nyt.append([])
 
+        self.numUnknowns = len(self.unknowns)
         # return reference to self for the context manager
         return self
 
@@ -81,47 +80,6 @@ class SudokuNYT:
         else:
             return False
 
-    def _nextNum(self,ind):
-        """finds the next valid number for index \'ind\' of the unknown squares"""
-        r = self.unknowns[ind][0]
-        c = self.unknowns[ind][1]
-        #if current cell is already 9 and nextNum was called,
-        #there's no other number that will work
-        if self.sudoku[r][c] == 9:
-            self.sudoku[r][c] = 0
-            self._delNum(ind)
-            return False
-
-        self.sudoku[r][c] += 1
-        while self.sudoku[r][c] <= 9:
-            if self._isConflict(r, c, self.sudoku[r][c]):
-                self.sudoku[r][c] += 1
-            else:
-                break
-        #this means no number satisfying constraints has been found - return False
-        if self.sudoku[r][c] == 10:
-            self.sudoku[r][c] = 0
-            self._delNum(ind)
-            return False
-        #otherwise, return true
-        else:
-            if not self.quiet:
-                self._fillNum(ind,self.sudoku[r][c])
-            return True
-
-    def _guess(self,it):
-        """solves the sudoku by backtracking."""
-        #in this case the sudoku has been solved
-        if it == len(self.unknowns):
-           return True
-        flag = False
-        #guess(n) is called every time guess(n+1) has returned false
-        #and _nextNum() can still find numbers that satisfy constraints
-        #at index unknowns[n]. Otherwise, guess(n) returns false
-        #and program backtracks to guess(n-1)
-        while (not flag) and self._nextNum(it):
-            flag = self._guess(it+1)
-        return flag
 
     def solve(self, quiet=False):
         """driver for guess method"""
@@ -172,15 +130,67 @@ class SudokuNYT:
             self._fillNum(ind, self.sudoku[r][c])
         time.sleep(2)
 
+class SudokuBacktrack(SudokuNYT):
+    def _nextNum(self,ind):
+        """finds the next valid number for index 'ind' of the unknown squares."""
+        r = self.unknowns[ind][0]
+        c = self.unknowns[ind][1]
+        #if current cell is already 9 and nextNum was called,
+        #there's no other number that will work
+        if self.sudoku[r][c] == 9:
+            self.sudoku[r][c] = 0
+            self._delNum(ind)
+            return False
 
-def sudoku(diff="easy",q=False):
+        self.sudoku[r][c] += 1
+        while self.sudoku[r][c] <= 9:
+            if self._isConflict(r, c, self.sudoku[r][c]):
+                self.sudoku[r][c] += 1
+            else:
+                break
+        #this means no number satisfying constraints has been found - return False
+        if self.sudoku[r][c] == 10:
+            #keep with the "0 = unknown" convention, doesn't take much extra time
+            self.sudoku[r][c] = 0
+            self._delNum(ind)
+            return False
+        #otherwise, return true
+        else:
+            if not self.quiet:
+                self._fillNum(ind,self.sudoku[r][c])
+            return True
+
+    def _guess(self,it):
+        """solves the sudoku by backtracking."""
+        #in this case the sudoku has been solved
+        if it == self.numUnknowns:
+           return True
+        flag = False
+        #guess(n) is called every time guess(n+1) has returned false
+        #and _nextNum() can still find numbers that satisfy constraints
+        #at index unknowns[n]. If _nextNum(it) returns false, guess(n)
+        #returns false and program backtracks to guess(n-1)
+        while (not flag) and self._nextNum(it):
+            flag = self._guess(it+1)
+        return flag
+
+class SudokuHuman(SudokuNYT):
+    def __init__(self, diff):
+        super().__init__(diff)
+
+    def _nextNum(self):
+        pass
+
+    def _guess(self):
+        pass
+
+def sudoku(diff="easy",q=False,mode="Backtrack"):
     while(not diff in ["easy","medium","hard"]):
         diff = input("Enter a difficulty ('easy','medium', or 'hard')")
 
-#     str = """_____________________________
-# to solve, type 's' or 'solve': """
-    with SudokuNYT(diff) as su:
-        # s = input(str)
-        # while(not s in ['s','solve']):
-        #     s = input(str)
-        su.solve(quiet=q)
+    if (mode=="Backtrack"):
+        with SudokuBacktrack(diff) as su:
+            su.solve(quiet=q)
+    else:
+        with SudokuHuman(diff) as su:
+            su.solve(quiet=q)
