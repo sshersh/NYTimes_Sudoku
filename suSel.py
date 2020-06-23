@@ -12,16 +12,14 @@ import sys, traceback
 # to turn off solving visualization (much faster), call solve() with quiet=True
 
 options = webdriver.ChromeOptions()
-options.add_argument('--ignore-certificate-errors')
-options.add_argument('--ignore-ssl-errors')
-options.add_argument('--headless')
-options.add_argument('--disable-gpu')
+options.add_argument('log-level=3')
+
 #options.binary_location = "C:/Program Files (x86)/Google/Chrome Beta/Application"
 PATH_TO_CHROMEDRIVER = "C:/Users/sam/Anaconda3/pkgs/chromedriver_win32/chromedriver.exe"
 IGNORED_EXCEPTIONS = (KeyboardInterrupt, NoSuchWindowException, ConnectionResetError, SystemExit)
 
 class SudokuNYT:
-    def __init__(self,diff):
+    def __init__(self,diff,headless):
         """navigates to easy, medium or hard nytimes sudoku and extracts knowns and keypad"""
         self.nyt = [[]]
         self.sudoku = [[]]
@@ -30,27 +28,35 @@ class SudokuNYT:
         self.keys = []
         self.cands = [[]]
         self.diff = diff
+        self.headless = headless
+        if headless==True:
+            options.add_argument('--headless')
+            options.add_argument('--disable-gpu')
 
-    def __enter__(self):
-        # configure chromedriver
-        self.driver = webdriver.Chrome(PATH_TO_CHROMEDRIVER, options = options)
+    def _fromFile(self):
+        self.driver.get("file:///%USERPROFILE%/Anaconda3/NYTimes_Sudoku/Sudoku_6-23/easy.html")
+
+    def _fromWeb(self):
         self.driver.get(r"https://www.nytimes.com/puzzles/sudoku/" + self.diff)
-        # self.driver.get("file:///%USERPROFILE%/Anaconda3/NYTimes_Sudoku/Sudoku_6-23")
-
         self.delete = self.driver.find_element_by_css_selector(r"div.su-keyboard div.su-keyboard__delete")
         # open chromedriver and navigate to nytimes sudoku
         self.driver.implicitly_wait(0.1)
         # get the keypad and put into keys list
-        keypad = self.driver.find_element_by_css_selector(r"div.su-keyboard__container")
+        self.keypad = self.driver.find_element_by_css_selector(r"div.su-keyboard__container")
         for nums in range(1,10):
-            self.keys.append(keypad.find_element_by_xpath("div[{}]".format(nums)))
-        # time to make the board
-        board = self.driver.find_element_by_css_selector(r"div.su-board")
+            self.keys.append(self.keypad.find_element_by_xpath("div[{}]".format(nums)))
+        self.board = self.driver.find_element_by_css_selector(r"div.su-board")
+
+    def __enter__(self):
+        # configure chromedriver
+        self.driver = webdriver.Chrome(PATH_TO_CHROMEDRIVER, options = options)
+
+        self._fromWeb()
 
         for row in range(0,9):
             for col in range(0,9):
                 cur = row*9 + col + 1
-                currentCell = board.find_element_by_xpath("div[{}]".format(cur))
+                currentCell = self.board.find_element_by_xpath("div[{}]".format(cur))
                 currentVal = currentCell.get_attribute("aria-label")
                 if currentVal == "empty":
                     self.sudoku[row].append(0)
@@ -99,6 +105,20 @@ class SudokuNYT:
         else:
             return False
 
+    def solve(self):
+        """High level program flow method"""
+        endVal = self._guessDriver()
+        if endVal:
+            if self.headless:
+                self.printSudoku()
+            print("Sudoku solved!")
+            self.solved = True
+            #need enough time to hear the victory music
+            sleep(4)
+        else:
+            print("Sudoku not solved.")
+            self.printSudoku()
+
     def printSudoku(self):
         """simple utility for printing list to command line.
         Unknowns are marked with an asterisk *"""
@@ -113,27 +133,28 @@ class SudokuNYT:
 
     def _fillNum(self, ind):
         """fill in a number in cell specified by ind"""
-        self.driver.implicitly_wait(0.01)
-        row = self.unknowns[ind][0]
-        col = self.unknowns[ind][1]
-        self.nyt[row][col].click()
-        self.keys[self.sudoku[row][col]-1].click()
+        if not self.headless:
+            self.driver.implicitly_wait(0.01)
+            row = self.unknowns[ind][0]
+            col = self.unknowns[ind][1]
+            self.nyt[row][col].click()
+            self.keys[self.sudoku[row][col]-1].click()
 
     def _delNum(self, ind):
         """delete a number in cell specified by ind"""
-        if self.display:
+        if not self.headless:
             self.driver.implicitly_wait(0.01)
             row = self.unknowns[ind][0]
             col = self.unknowns[ind][1]
             self.nyt[row][col].click()
             self.delete.click()
 
-    def _fillSudoku(self):
-        """fill in whole sudoku (for quiet mode)"""
-        for ind in range(0, len(self.unknowns)):
-            self._fillNum(ind)
+    # def _fillSudoku(self):
+    #     """fill in whole sudoku (for quiet mode)"""
+    #     for ind in range(0, len(self.unknowns)):
+    #         self._fillNum(ind)
 
-class SudokuBacktrack(SudokuNYT):
+class Sudoku1(SudokuNYT):
     def _nextNum(self,ind):
         """finds the next valid number for index 'ind' of the unknown squares."""
         r = self.unknowns[ind][0]
@@ -162,8 +183,7 @@ class SudokuBacktrack(SudokuNYT):
         #otherwise, fill in sudoku[r][c] and return true
         else:
             self.sudoku[r][c] = tempGuess
-            if self.display:
-                self._fillNum(ind)
+            self._fillNum(ind)
             return True
 
     def _guess(self,it):
@@ -180,31 +200,22 @@ class SudokuBacktrack(SudokuNYT):
             flag = self._guess(it+1)
         return flag
 
-    def solve(self, display=False):
+    def _guessDriver(self):
         """driver for guess method"""
-        self.display = display
-        endVal = self._guess(0)
-        if endVal:
-            if not self.display:
-                self._fillSudoku()
-            print("Sudoku solved!")
-            self.solved = True
-            #need enough time to hear the victory music
-            sleep(4)
-        else:
-            print("Sudoku not solved.")
+        return self._guess(0)
 
-class SudokuHuman(SudokuNYT):
-    def __init__(self, diff):
-        super().__init__(diff)
+class Sudoku2(SudokuNYT):
+    def __init__(self, diff, headless):
+        super().__init__(diff, headless)
         self.cands = [[]]
+        self.numGuesses = 0
 
     def __enter__(self):
         super().__enter__()
         fullList = [i for i in range(1,10)]
 
         ind = self.knowns[0]
-        start = 0;
+        start = 0
         for row in range(0,9):
             for col in range(0,9):
                 if (row, col) != ind:
@@ -217,12 +228,13 @@ class SudokuHuman(SudokuNYT):
             if row != 8:
                 self.cands.append([])
 
+
         for ii in range(0, self.numKnowns):
-            self._updateCands((self.knowns[ii][0],self.knowns[ii][1]), self.cands)
+            self._updateCands(self.cands,(self.knowns[ii][0],self.knowns[ii][1]))
 
         return self
 
-    def _updateCands(self, ind, cands):
+    def _updateCands(self,cands,ind):
         """Updates the local candidate list for each cell and returns
         the cell with shortest list.
         Input argument is the index the cell (row, col)"""
@@ -242,48 +254,52 @@ class SudokuHuman(SudokuNYT):
             except ValueError:
                 pass
 
-            l = len(self.cands[ii][jj])
+            l = len(cands[ii][jj])
 
             #If l == 0 then backtrack, if 1st element is 0 then it is known
-            if l != 0 and self.cands[ii][jj][0] != 0 and l < min:
-                min = l
-                minInd = (ii, jj)
-            elif l == 0:
+            if l != 0:
+                if cands[ii][jj][0] != 0 and l < min:
+                    min = l
+                    minInd = (ii, jj)
+            else:
                 #return impossible index so caller knows to backtrack
                 return (9,9)
-            else:
-                continue
 
         #Update the candidate list for the chosen cell
-        cands[minInd[0]][minInd[1]] = [0]
         return minInd
 
+    def _guess(self,cands,ind=(0,0)):
+        """Recursive guesser method. Input args are a (deep) copy of candidate
+        list and index of last guess."""
+        if self.numGuesses == self.numUnknowns:
+            return True
+        #set the candidate list of last guess to 0
+        cands[ind[0]][ind[1]] = [0]
+        #find the cell with shortest candidate list
+        minInd = self._updateCands(cands,ind)
+        if minInd == (9,9):
+            return False
+        r, c = minInd
+        for curGuess in cands[r][c]:
+            self.sudoku[r][c] = curGuess
+            self.numGuesses += 1
+            if self._guess(deepcopy(cands), minInd):
+                return True
+            self.numGuesses -= 1
+        self.sudoku[r][c] = 0
+        return False
 
-    # def _addCands(self, ind, num):
-    #     r = self.knowns[ind][0]
-    #     c = self.knowns[ind][1]
-    #     for (ii, jj) in self._findGroup(r, c):
-    #         self.cands[ii][jj].append(num)
+    def _guessDriver(self):
+        return self._guess(self.cands)
 
-    def _nextNum(self):
-        pass
-
-    def _solve(self):
-        """Driver for guess() method"""
-        #Start with original candidate list
-        pass
-
-    def _guess(self, cands):
-        pass
-
-def sudoku(diff="easy",display=True,mode="Backtrack"):
+def sudoku(diff="easy",headless=False,strategy="backtrack"):
     while(not diff in ["easy","medium","hard"]):
         diff = input("Enter a difficulty ('easy','medium', or 'hard')")
 
-    if (mode=="Backtrack"):
-        sudoku = SudokuBacktrack(diff)
+    if (strategy=="backtrack"):
+        sudoku = Sudoku1(diff,headless)
     else:
-        sudoku = SudokuHuman(diff)
+        sudoku = Sudoku2(diff,headless)
 
     with sudoku as su:
-        su.solve(display=display)
+        su.solve()
