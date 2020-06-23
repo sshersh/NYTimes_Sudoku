@@ -41,6 +41,7 @@ class SudokuNYT:
             self.keys.append(keypad.find_element_by_xpath("div[{}]".format(nums)))
         # time to make the board
         board = self.driver.find_element_by_css_selector(r"div.su-board")
+
         for row in range(0,9):
             for col in range(0,9):
                 cur = row*9 + col + 1
@@ -68,20 +69,24 @@ class SudokuNYT:
         if exc_type in IGNORED_EXCEPTIONS:
             print("Manual Override Detected, Closing Processes")
         self.driver.quit()
-        self.printSudoku()
+        # self.printSudoku()
         return isinstance(exc_val, IGNORED_EXCEPTIONS)
 
-    def _isConflict(self,row,col,num):
-        """determines if a value is allowed"""
+    def _findGroup(self, row, col):
+        """returns list of indices of cells in same row, column and/or block"""
         #important to exclude current index from col (python makes shallow copy)
-        sameCol = [self.sudoku[x][col] for x in range(0,9) if x != row]
-        sameRow = self.sudoku[row][0:col] + self.sudoku[row][col+1:9]
-        #use floor division to find appropriate block
-        rowBlock = range(3*(row//3),3*(row//3 + 1))
-        colBlock = range(3*(col//3),3*(col//3 + 1))
-        sameBlock = [self.sudoku[ii][jj] for ii in rowBlock for jj in colBlock if ii != row or jj != col]
+        sameRow = [(row,jj) for jj in range(0,3*(col//3))] + [(row,jj) for jj in range(3*(col//3 + 1),9)]
+        sameCol = [(ii,col) for ii in range(0,3*(row//3))] + [(ii,col) for ii in range(3*(row//3 + 1),9)]
+        sameBlock = [(ii,jj) for ii in range(3*(row//3),3*(row//3 + 1)) \
+            for jj in range(3*(col//3),3*(col//3 + 1)) if ii != row or jj != col]
 
-        if num in sameRow or num in sameCol or num in sameBlock:
+        return sameRow + sameCol + sameBlock
+
+    def _isConflict(self,row,col,num):
+        """determines if a value in sudoku[row][col] is allowed"""
+        vals = [self.sudoku[ii][jj] for (ii,jj) in self._findGroup(row,col)]
+        # if num in sameRow or num in sameCol or num in sameBlock:
+        if num in vals:
             return True
         else:
             return False
@@ -184,6 +189,18 @@ class SudokuBacktrack(SudokuNYT):
 class SudokuHuman(SudokuNYT):
     def __init__(self, diff):
         super().__init__(diff)
+        self.cands = [[[]]]
+
+    def __enter__(self):
+        super().__enter__()
+
+    def updateCands(self, ind):
+        """Updates the candidate list for each cell and returns the smallest.
+        Input argument is the index of the cell in unknowns[]"""
+        r = self.unknowns[ind][0]
+        c = self.unknowns[ind][1]
+
+
 
     def _nextNum(self):
         pass
