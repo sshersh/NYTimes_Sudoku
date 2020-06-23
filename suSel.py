@@ -1,7 +1,8 @@
 from selenium import webdriver
 from selenium.common.exceptions import *
+from copy import deepcopy
 from contextlib import contextmanager
-import time
+from time import sleep
 import sys, traceback
 
 # class to solve and fill in New York Times sudokus
@@ -13,6 +14,8 @@ import sys, traceback
 options = webdriver.ChromeOptions()
 options.add_argument('--ignore-certificate-errors')
 options.add_argument('--ignore-ssl-errors')
+options.add_argument('--headless')
+options.add_argument('--disable-gpu')
 #options.binary_location = "C:/Program Files (x86)/Google/Chrome Beta/Application"
 PATH_TO_CHROMEDRIVER = "C:/Users/sam/Anaconda3/pkgs/chromedriver_win32/chromedriver.exe"
 IGNORED_EXCEPTIONS = (KeyboardInterrupt, NoSuchWindowException, ConnectionResetError, SystemExit)
@@ -23,6 +26,7 @@ class SudokuNYT:
         self.nyt = [[]]
         self.sudoku = [[]]
         self.unknowns = []
+        self.knowns = []
         self.keys = []
         self.cands = [[]]
         self.diff = diff
@@ -31,6 +35,7 @@ class SudokuNYT:
         # configure chromedriver
         self.driver = webdriver.Chrome(PATH_TO_CHROMEDRIVER, options = options)
         self.driver.get(r"https://www.nytimes.com/puzzles/sudoku/" + self.diff)
+        # self.driver.get("file:///%USERPROFILE%/Anaconda3/NYTimes_Sudoku/Sudoku_6-23")
 
         self.delete = self.driver.find_element_by_css_selector(r"div.su-keyboard div.su-keyboard__delete")
         # open chromedriver and navigate to nytimes sudoku
@@ -54,6 +59,8 @@ class SudokuNYT:
                 else:
                     self.nyt[row].append(currentCell)
                     self.sudoku[row].append(int(currentVal))
+                    self.knowns.append((row,col))
+            #janky trick to center the grid on the page
             if row == 8:
                 currentCell.click()
                 break
@@ -61,7 +68,7 @@ class SudokuNYT:
             self.nyt.append([])
 
         self.numUnknowns = len(self.unknowns)
-
+        self.numKnowns = len(self.knowns)
         # return reference to self for the context manager
         return self
 
@@ -75,6 +82,7 @@ class SudokuNYT:
     def _findGroup(self, row, col):
         """returns list of indices of cells in same row, column and/or block"""
         #important to exclude current index from col (python makes shallow copy)
+        #sameRow and sameCol exclude elements in same block to avoid duplicates
         sameRow = [(row,jj) for jj in range(0,3*(col//3))] + [(row,jj) for jj in range(3*(col//3 + 1),9)]
         sameCol = [(ii,col) for ii in range(0,3*(row//3))] + [(ii,col) for ii in range(3*(row//3 + 1),9)]
         sameBlock = [(ii,jj) for ii in range(3*(row//3),3*(row//3 + 1)) \
@@ -182,7 +190,7 @@ class SudokuBacktrack(SudokuNYT):
             print("Sudoku solved!")
             self.solved = True
             #need enough time to hear the victory music
-            time.sleep(4)
+            sleep(4)
         else:
             print("Sudoku not solved.")
 
@@ -193,16 +201,45 @@ class SudokuHuman(SudokuNYT):
 
     def __enter__(self):
         super().__enter__()
+        fullList = [i for i in range(1,10)]
 
-    def updateCands(self, ind):
-        """Updates the candidate list for each cell and returns the smallest.
+        ind = self.knowns[0]
+        start = 0;
+        for row in range(0,9):
+            for col in range(0,9):
+                if (row, col) != ind:
+                    self.cands[row].append(deepcopy(fullList))
+                else:
+                    start += 1
+                    if start < self.numKnowns:
+                        ind = self.knowns[start]
+                    self.cands[row].append([])
+            self.cands.append([])
+
+        #faster than another if statement on every iteration
+        del self.cands[0][0]
+        del self.cands[9]
+
+        for ii in range(0, self.numKnowns):
+            self._removeCands(ii)
+        return self
+
+    def _removeCands(self, ind):
+        """Updates the candidate list for each cell and returns the cell with smallest.
         Input argument is the index of the cell in unknowns[]"""
-        r = self.unknowns[ind][0]
-        c = self.unknowns[ind][1]
 
+        r = self.knowns[ind][0]
+        c = self.knowns[ind][1]
+        num = self.sudoku[r][c]
 
+        for (ii, jj) in self._findGroup(r, c):
+            try:
 
-    def _nextNum(self):
+                self.cands[ii][jj].remove(num)
+            except ValueError:
+                pass
+
+    def _addCands(self, ind, num):
         pass
 
     def _guess(self):
