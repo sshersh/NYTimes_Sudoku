@@ -197,7 +197,7 @@ class SudokuBacktrack(SudokuNYT):
 class SudokuHuman(SudokuNYT):
     def __init__(self, diff):
         super().__init__(diff)
-        self.cands = [[[]]]
+        self.cands = [[]]
 
     def __enter__(self):
         super().__enter__()
@@ -213,36 +213,67 @@ class SudokuHuman(SudokuNYT):
                     start += 1
                     if start < self.numKnowns:
                         ind = self.knowns[start]
-                    self.cands[row].append([])
-            self.cands.append([])
-
-        #faster than another if statement on every iteration
-        del self.cands[0][0]
-        del self.cands[9]
+                    self.cands[row].append([0])
+            if row != 8:
+                self.cands.append([])
 
         for ii in range(0, self.numKnowns):
-            self._removeCands(ii)
+            self._updateCands((self.knowns[ii][0],self.knowns[ii][1]), self.cands)
+
         return self
 
-    def _removeCands(self, ind):
-        """Updates the candidate list for each cell and returns the cell with smallest.
-        Input argument is the index of the cell in unknowns[]"""
+    def _updateCands(self, ind, cands):
+        """Updates the local candidate list for each cell and returns
+        the cell with shortest list.
+        Input argument is the index the cell (row, col)"""
 
-        r = self.knowns[ind][0]
-        c = self.knowns[ind][1]
+        r, c = ind
         num = self.sudoku[r][c]
-
+        #shortest candidate list
+        min = 9
+        #index of shortest candidate list
+        minInd = (9,9)
         for (ii, jj) in self._findGroup(r, c):
+            #Since this is a deep inner loop, handling the "ValueError" produced
+            #by remove() when num isn't in a list should be quicker than
+            #checking for num before deleting it
             try:
-
-                self.cands[ii][jj].remove(num)
+                cands[ii][jj].remove(num)
             except ValueError:
                 pass
 
-    def _addCands(self, ind, num):
+            l = len(self.cands[ii][jj])
+
+            #If l == 0 then backtrack, if 1st element is 0 then it is known
+            if l != 0 and self.cands[ii][jj][0] != 0 and l < min:
+                min = l
+                minInd = (ii, jj)
+            elif l == 0:
+                #return impossible index so caller knows to backtrack
+                return (9,9)
+            else:
+                continue
+
+        #Update the candidate list for the chosen cell
+        cands[minInd[0]][minInd[1]] = [0]
+        return minInd
+
+
+    # def _addCands(self, ind, num):
+    #     r = self.knowns[ind][0]
+    #     c = self.knowns[ind][1]
+    #     for (ii, jj) in self._findGroup(r, c):
+    #         self.cands[ii][jj].append(num)
+
+    def _nextNum(self):
         pass
 
-    def _guess(self):
+    def _solve(self):
+        """Driver for guess() method"""
+        #Start with original candidate list
+        pass
+
+    def _guess(self, cands):
         pass
 
 def sudoku(diff="easy",display=True,mode="Backtrack"):
