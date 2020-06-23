@@ -1,6 +1,8 @@
 from selenium import webdriver
+from selenium.common.exceptions import *
 from contextlib import contextmanager
 import time
+import sys, traceback
 
 # class to solve and fill in New York Times sudokus
 # scrolling or moving mouse excessively can through the solver off track
@@ -13,6 +15,7 @@ options.add_argument('--ignore-certificate-errors')
 options.add_argument('--ignore-ssl-errors')
 #options.binary_location = "C:/Program Files (x86)/Google/Chrome Beta/Application"
 PATH_TO_CHROMEDRIVER = "C:/Users/sam/Anaconda3/pkgs/chromedriver_win32/chromedriver.exe"
+IGNORED_EXCEPTIONS = (KeyboardInterrupt, NoSuchWindowException, ConnectionResetError, SystemExit)
 
 class SudokuNYT:
     def __init__(self,diff):
@@ -23,9 +26,9 @@ class SudokuNYT:
         self.keys = []
         self.cands = [[]]
         self.diff = diff
-        # configure chromedriver
 
     def __enter__(self):
+        # configure chromedriver
         self.driver = webdriver.Chrome(PATH_TO_CHROMEDRIVER, options = options)
         self.driver.get(r"https://www.nytimes.com/puzzles/sudoku/" + self.diff)
 
@@ -57,16 +60,19 @@ class SudokuNYT:
             self.nyt.append([])
 
         self.numUnknowns = len(self.unknowns)
+
         # return reference to self for the context manager
         return self
 
-    def __exit__(self, exc_type, exc_value, tb):
-        if exc_type is not None:
-            traceback.print_exception(exc_type, exc_value, tb)
+    def __exit__(self, exc_type, exc_val, tb):
+        if exc_type in IGNORED_EXCEPTIONS:
+            print("Manual Override Detected, Closing Processes")
         self.driver.quit()
+        self.printSudoku()
+        return isinstance(exc_val, IGNORED_EXCEPTIONS)
 
     def _isConflict(self,row,col,num):
-        """determines if a value is impossible"""
+        """determines if a value is allowed"""
         #important to exclude current index from col (python makes shallow copy)
         sameCol = [self.sudoku[x][col] for x in range(0,9) if x != row]
         sameRow = self.sudoku[row][0:col] + self.sudoku[row][col+1:9]
@@ -80,19 +86,6 @@ class SudokuNYT:
         else:
             return False
 
-
-    def solve(self, quiet=False):
-        """driver for guess method"""
-        self.quiet = quiet
-        endVal = self._guess(0)
-        if endVal:
-            if self.quiet:
-                self._fillSudoku()
-            print("Sudoku solved!")
-            self.solved = True
-        else:
-            print("Sudoku not solved.")
-
     def printSudoku(self):
         """simple utility for printing list to command line.
         Unknowns are marked with an asterisk *"""
@@ -105,17 +98,17 @@ class SudokuNYT:
             print("\n")
         print('\n' * 3)
 
-    def _fillNum(self, ind, num):
+    def _fillNum(self, ind):
         """fill in a number in cell specified by ind"""
         self.driver.implicitly_wait(0.01)
         row = self.unknowns[ind][0]
         col = self.unknowns[ind][1]
         self.nyt[row][col].click()
-        self.keys[num-1].click()
+        self.keys[self.sudoku[row][col]-1].click()
 
     def _delNum(self, ind):
         """delete a number in cell specified by ind"""
-        if not self.quiet:
+        if self.display:
             self.driver.implicitly_wait(0.01)
             row = self.unknowns[ind][0]
             col = self.unknowns[ind][1]
@@ -125,39 +118,39 @@ class SudokuNYT:
     def _fillSudoku(self):
         """fill in whole sudoku (for quiet mode)"""
         for ind in range(0, len(self.unknowns)):
-            r = self.unknowns[ind][0]
-            c = self.unknowns[ind][1]
-            self._fillNum(ind, self.sudoku[r][c])
-        time.sleep(2)
+            self._fillNum(ind)
 
 class SudokuBacktrack(SudokuNYT):
     def _nextNum(self,ind):
         """finds the next valid number for index 'ind' of the unknown squares."""
         r = self.unknowns[ind][0]
         c = self.unknowns[ind][1]
+
+        tempGuess = self.sudoku[r][c]
         #if current cell is already 9 and nextNum was called,
         #there's no other number that will work
-        if self.sudoku[r][c] == 9:
+        if tempGuess == 9:
             self.sudoku[r][c] = 0
             self._delNum(ind)
             return False
 
-        self.sudoku[r][c] += 1
-        while self.sudoku[r][c] <= 9:
-            if self._isConflict(r, c, self.sudoku[r][c]):
-                self.sudoku[r][c] += 1
+        tempGuess += 1
+        while tempGuess <= 9:
+            if self._isConflict(r, c, tempGuess):
+                tempGuess += 1
             else:
                 break
         #this means no number satisfying constraints has been found - return False
-        if self.sudoku[r][c] == 10:
-            #keep with the "0 = unknown" convention, doesn't take much extra time
+        if tempGuess == 10:
+            #keep with the "0 = unknown" convention
             self.sudoku[r][c] = 0
             self._delNum(ind)
             return False
-        #otherwise, return true
+        #otherwise, fill in sudoku[r][c] and return true
         else:
-            if not self.quiet:
-                self._fillNum(ind,self.sudoku[r][c])
+            self.sudoku[r][c] = tempGuess
+            if self.display:
+                self._fillNum(ind)
             return True
 
     def _guess(self,it):
@@ -174,6 +167,20 @@ class SudokuBacktrack(SudokuNYT):
             flag = self._guess(it+1)
         return flag
 
+    def solve(self, display=False):
+        """driver for guess method"""
+        self.display = display
+        endVal = self._guess(0)
+        if endVal:
+            if not self.display:
+                self._fillSudoku()
+            print("Sudoku solved!")
+            self.solved = True
+            #need enough time to hear the victory music
+            time.sleep(4)
+        else:
+            print("Sudoku not solved.")
+
 class SudokuHuman(SudokuNYT):
     def __init__(self, diff):
         super().__init__(diff)
@@ -184,13 +191,14 @@ class SudokuHuman(SudokuNYT):
     def _guess(self):
         pass
 
-def sudoku(diff="easy",q=False,mode="Backtrack"):
+def sudoku(diff="easy",display=True,mode="Backtrack"):
     while(not diff in ["easy","medium","hard"]):
         diff = input("Enter a difficulty ('easy','medium', or 'hard')")
 
     if (mode=="Backtrack"):
-        with SudokuBacktrack(diff) as su:
-            su.solve(quiet=q)
+        sudoku = SudokuBacktrack(diff)
     else:
-        with SudokuHuman(diff) as su:
-            su.solve(quiet=q)
+        sudoku = SudokuHuman(diff)
+
+    with sudoku as su:
+        su.solve(display=display)
