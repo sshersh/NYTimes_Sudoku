@@ -1,8 +1,8 @@
 from .SudokuBase import *
 
 class Sudoku2(SudokuBase):
-    def __init__(self, diff, headless):
-        super().__init__(diff, headless)
+    def __init__(self, diff="easy", input_sudoku=[[]], headless=True):
+        super().__init__(diff, input_sudoku, headless)
         self.cands = [[]]
         self.numGuesses = 0
 

@@ -10,7 +10,6 @@ import sys, traceback
 # must have matching versions of selenium, chromedriver and chrome/chromium installed
 # for medium or hard sudokus, initalialize sudoku with "medium" or "hard"
 # to turn off solving visualization (much faster), call solve() with quiet=True
-
 options = webdriver.ChromeOptions()
 options.add_argument('log-level=3')
 
@@ -19,22 +18,36 @@ PATH_TO_CHROMEDRIVER = "C:/Users/sam/Anaconda3/pkgs/chromedriver_win32/chromedri
 IGNORED_EXCEPTIONS = (KeyboardInterrupt, NoSuchWindowException, ConnectionResetError, SystemExit)
 
 class SudokuBase:
-    def __init__(self,diff,headless):
+    def __init__(self,diff="easy",input_sudoku=False,headless=True):
         """navigates to easy, medium or hard nytimes sudoku and extracts knowns and keypad"""
         self.nyt = [[]]
         self.unknowns = []
         self.knowns = []
         self.keys = []
-        self.sudoku = [[]]
+        self.from_web = not input_sudoku
+        if self.from_web:
+            self.sudoku = [[]]
+        else:
+            self.sudoku = input_sudoku
         self.cands = [[]]
         self.diff = diff
         self.headless = headless
-        if headless==True:
+
+        if headless==True and self.from_web:
             options.add_argument('--headless')
             options.add_argument('--disable-gpu')
 
-    def _fromFile(self):
-        pass
+    def _fromList(self):
+        for row in range(0,9):
+            for col in range(0,9):
+                try:
+                    if self.sudoku[row][col] == 0:
+                        self.unknowns.append((row, col))
+                    else:
+                        self.knowns.append((row, col))
+                except IndexError:
+                    print(row," ", col)
+                    raise
 
     def _fromWeb(self):
         self.driver.get(r"https://www.nytimes.com/puzzles/sudoku/" + self.diff)
@@ -46,12 +59,6 @@ class SudokuBase:
         for nums in range(1,10):
             self.keys.append(self.keypad.find_element_by_xpath("div[{}]".format(nums)))
         self.board = self.driver.find_element_by_css_selector(r"div.su-board")
-
-    def __enter__(self):
-        # configure chromedriver
-        self.driver = webdriver.Chrome(PATH_TO_CHROMEDRIVER, options = options)
-
-        self._fromWeb()
 
         for row in range(0,9):
             for col in range(0,9):
@@ -73,6 +80,14 @@ class SudokuBase:
             self.sudoku.append([])
             self.nyt.append([])
 
+    def __enter__(self):
+        # configure chromedriver
+        if self.from_web:
+            self.driver = webdriver.Chrome(PATH_TO_CHROMEDRIVER, options = options)
+            self._fromWeb()
+        else:
+            self._fromList()
+
         self.numUnknowns = len(self.unknowns)
         self.numKnowns = len(self.knowns)
         # return reference to self for the context manager
@@ -81,7 +96,8 @@ class SudokuBase:
     def __exit__(self, exc_type, exc_val, tb):
         if exc_type in IGNORED_EXCEPTIONS:
             print("Manual Override Detected, Closing Processes")
-        self.driver.quit()
+        if self.from_web:
+            self.driver.quit()
         # self.printSudoku()
         return isinstance(exc_val, IGNORED_EXCEPTIONS)
 
@@ -109,12 +125,13 @@ class SudokuBase:
         """High level program flow method"""
         endVal = self._guessDriver()
         if endVal:
-            if self.headless:
+            if self.headless or not self.from_web:
                 self.printSudoku()
+            else:
+                sleep(4)
             print("Sudoku solved!")
             self.solved = True
             #need enough time to hear the victory music
-            sleep(4)
         else:
             print("Sudoku not solved.")
             self.printSudoku()
@@ -133,7 +150,7 @@ class SudokuBase:
 
     def _fillNum(self, ind):
         """fill in a number in cell specified by ind"""
-        if not self.headless:
+        if self.from_web and not self.headless:
             self.driver.implicitly_wait(0.01)
             row = self.unknowns[ind][0]
             col = self.unknowns[ind][1]
@@ -142,7 +159,7 @@ class SudokuBase:
 
     def _delNum(self, ind):
         """delete a number in cell specified by ind"""
-        if not self.headless:
+        if self.from_web and not self.headless:
             self.driver.implicitly_wait(0.01)
             row = self.unknowns[ind][0]
             col = self.unknowns[ind][1]
