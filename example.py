@@ -4,8 +4,14 @@ from src import *
 
 # solve an easy sudoku
 # sudoku("hard",headless=True,strategy=2)
-sudokus = loadFromJSON("top1465")
+# sudokus = loadFromJSON("ksudoku16")
+# numPuzzles = 5
 
-sudoku(input_sudoku=sudokus[0], strategy=1)
+sudoku('hard',headless=True,strategy=2)
+
+# if checkSoln():
+#     print("Soln correct")
+# else:
+#     print("Soln incorrect")
 # solve a medium sudoku with the quiet setting (dramatically speeds performance)
 # sudoku("medium",True)

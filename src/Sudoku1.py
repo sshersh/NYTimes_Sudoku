@@ -7,21 +7,21 @@ class Sudoku1(SudokuBase):
         c = self.unknowns[ind][1]
 
         tempGuess = self.sudoku[r][c]
-        #if current cell is already 9 and nextNum was called,
+        #if current cell is already self.size and nextNum was called,
         #there's no other number that will work
-        if tempGuess == 9:
+        if tempGuess == self.size:
             self.sudoku[r][c] = 0
             self._delNum(ind)
             return False
 
         tempGuess += 1
-        while tempGuess <= 9:
+        while tempGuess <= self.size:
             if self._isConflict(r, c, tempGuess):
                 tempGuess += 1
             else:
                 break
         #this means no number satisfying constraints has been found - return False
-        if tempGuess == 10:
+        if tempGuess == self.size+1:
             #keep with the "0 = unknown" convention
             self.sudoku[r][c] = 0
             self._delNum(ind)

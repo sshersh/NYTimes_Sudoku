@@ -4,7 +4,8 @@ from copy import deepcopy
 from contextlib import contextmanager
 from time import sleep
 import sys, traceback
-
+from math import sqrt
+import json
 # class to solve and fill in New York Times sudokus
 # scrolling or moving mouse excessively can through the solver off track
 # must have matching versions of selenium, chromedriver and chrome/chromium installed
@@ -27,8 +28,10 @@ class SudokuBase:
         self.from_web = not input_sudoku
         if self.from_web:
             self.sudoku = [[]]
+            self.size = 9
         else:
             self.sudoku = input_sudoku
+            self.size = len(input_sudoku)
         self.cands = [[]]
         self.diff = diff
         self.headless = headless
@@ -38,8 +41,8 @@ class SudokuBase:
             options.add_argument('--disable-gpu')
 
     def _fromList(self):
-        for row in range(0,9):
-            for col in range(0,9):
+        for row in range(0,self.size):
+            for col in range(0,self.size):
                 try:
                     if self.sudoku[row][col] == 0:
                         self.unknowns.append((row, col))
@@ -56,13 +59,13 @@ class SudokuBase:
         self.driver.implicitly_wait(0.1)
         # get the keypad and put into keys list
         self.keypad = self.driver.find_element_by_css_selector(r"div.su-keyboard__container")
-        for nums in range(1,10):
+        for nums in range(1,self.size+1):
             self.keys.append(self.keypad.find_element_by_xpath("div[{}]".format(nums)))
         self.board = self.driver.find_element_by_css_selector(r"div.su-board")
 
-        for row in range(0,9):
-            for col in range(0,9):
-                cur = row*9 + col + 1
+        for row in range(0,self.size):
+            for col in range(0,self.size):
+                cur = row*self.size + col + 1
                 currentCell = self.board.find_element_by_xpath("div[{}]".format(cur))
                 currentVal = currentCell.get_attribute("aria-label")
                 if currentVal == "empty":
@@ -74,7 +77,7 @@ class SudokuBase:
                     self.sudoku[row].append(int(currentVal))
                     self.knowns.append((row,col))
             #janky trick to center the grid on the page
-            if row == 8:
+            if row == self.size-1:
                 currentCell.click()
                 break
             self.sudoku.append([])
@@ -105,10 +108,11 @@ class SudokuBase:
         """returns list of indices of cells in same row, column and/or block"""
         #important to exclude current index from col (python makes shallow copy)
         #sameRow and sameCol exclude elements in same block to avoid duplicates
-        sameRow = [(row,jj) for jj in range(0,3*(col//3))] + [(row,jj) for jj in range(3*(col//3 + 1),9)]
-        sameCol = [(ii,col) for ii in range(0,3*(row//3))] + [(ii,col) for ii in range(3*(row//3 + 1),9)]
-        sameBlock = [(ii,jj) for ii in range(3*(row//3),3*(row//3 + 1)) \
-            for jj in range(3*(col//3),3*(col//3 + 1)) if ii != row or jj != col]
+        root = int(sqrt(self.size))
+        sameRow = [(row,jj) for jj in range(0,root*(col//root))] + [(row,jj) for jj in range(root*(col//root + 1),self.size)]
+        sameCol = [(ii,col) for ii in range(0,root*(row//root))] + [(ii,col) for ii in range(root*(row//root + 1),self.size)]
+        sameBlock = [(ii,jj) for ii in range(root*(row//root),root*(row//root + 1)) \
+            for jj in range(root*(col//root),root*(col//root + 1)) if ii != row or jj != col]
 
         return sameRow + sameCol + sameBlock
 
@@ -139,8 +143,11 @@ class SudokuBase:
     def printSudoku(self):
         """simple utility for printing list to command line.
         Unknowns are marked with an asterisk *"""
-        for row in range(0,9):
-            for col in range(0,9):
+        with open('soln.json','w') as write_file:
+            json.dump(self.sudoku, write_file)
+
+        for row in range(0,self.size):
+            for col in range(0,self.size):
                 if (row,col) in self.unknowns and self.sudoku[row][col] != 0:
                     print(self.sudoku[row][col], end = '* ')
                 else:
