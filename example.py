@@ -7,7 +7,7 @@ from src import *
 # sudokus = loadFromJSON("ksudoku16")
 # numPuzzles = 5
 
-sudoku('hard',headless=True,strategy=2)
+sudoku('easy',headless=False,strategy=2)
 
 # if checkSoln():
 #     print("Soln correct")

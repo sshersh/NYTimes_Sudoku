@@ -1,4 +1,5 @@
 from selenium import webdriver
+import chromedriver_binary
 from selenium.common.exceptions import *
 from copy import deepcopy
 from contextlib import contextmanager
@@ -6,16 +7,18 @@ from time import sleep
 import sys, traceback
 from math import sqrt
 import json
+
 # class to solve and fill in New York Times sudokus
-# scrolling or moving mouse excessively can through the solver off track
+# scrolling or moving mouse excessively can throw solver off track
 # must have matching versions of selenium, chromedriver and chrome/chromium installed
 # for medium or hard sudokus, initalialize sudoku with "medium" or "hard"
 # to turn off solving visualization (much faster), call solve() with quiet=True
 options = webdriver.ChromeOptions()
 options.add_argument('log-level=3')
+options.add_argument("start-maximized")
 
 #options.binary_location = "C:/Program Files (x86)/Google/Chrome Beta/Application"
-PATH_TO_CHROMEDRIVER = "C:/Users/sam/Anaconda3/pkgs/chromedriver_win32/chromedriver.exe"
+#PATH_TO_CHROMEDRIVER = "C:/Users/sam/Anaconda3/pkgs/chromedriver_win32/chromedriver.exe"
 IGNORED_EXCEPTIONS = (KeyboardInterrupt, NoSuchWindowException, ConnectionResetError, SystemExit)
 
 class SudokuBase:
@@ -86,7 +89,7 @@ class SudokuBase:
     def __enter__(self):
         # configure chromedriver
         if self.from_web:
-            self.driver = webdriver.Chrome(PATH_TO_CHROMEDRIVER, options = options)
+            self.driver = webdriver.Chrome(options = options)
             self._fromWeb()
         else:
             self._fromList()
