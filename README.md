@@ -19,7 +19,7 @@ from src.sudoku import sudoku
 sudoku()
 ```
 
-A Chrome window should pop up and the program should navigate to the New York Times Sudoku and start filling in squares after a few seconds. The solver can also solve the medium and hard sudokus. The medium sudoku would be solved like so: 
+A Chrome window should pop up and the program should navigate to the New York Times Sudoku and start filling in squares after a few seconds. The solver can also solve the medium and hard sudokus. The hard sudoku would be solved like so: 
 ```python
 sudoku('hard')
 ```
