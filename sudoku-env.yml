@@ -19,11 +19,13 @@ dependencies:
   - six=1.15.0
   - sqlite=3.33.0
   - urllib3=1.26.2
-  - vc=14.2
-  - vs2015_runtime=14.27.29016
+# Uncomment following 2 lines if running on Windows  
+#  - vc=14.2
+#  - vs2015_runtime=14.27.29016
   - wheel=0.36.2
-  - win_inet_pton=1.1.0
-  - wincertstore=0.2
+# Uncomment following 2 lines if running on Windows  
+#  - win_inet_pton=1.1.0
+#  - wincertstore=0.2
   - zlib=1.2.11
   - pip:
     - chromedriver-binary-auto==0.1
