@@ -26,7 +26,7 @@ sudoku('hard')
 
 If you want to solve without showing steps (much faster) and using the fastest strategy, run:
 ```python
-sudoku('hard', headLess=True, strategy=2)
+sudoku('hard', headless=True, strategy=2)
 ```
 
 ## Strategies
@@ -41,10 +41,10 @@ Strategy \#1 is implemented in the Sudoku1 class in src/Sudoku1.py.
 
 ### Strategy \#2
 
-This algorithm runs when `strategy=2` is input as an argument to the `sudoku` function. Instead of making guesses linearly, the Minimum Remaining Value heuristic was used to decide which square to guess on each iteration. In English, this means that the square with the least number of possible candidates is guessed. This greatly speeds up the solver and allows medium and hard sudokus to be solved quickly (you might have to set `headless=True` because of the lag introduced by the visual feature).  
+This algorithm runs when `strategy=2` is input as an argument to the `sudoku` function. Instead of making guesses linearly, the Minimum Remaining Value heuristic was used to decide which square to guess on each iteration. In English, this means the square with the least number of possible candidates is guessed. This greatly speeds up the solver and allows medium and hard sudokus to be solved reliably (you might have to set `headless=True` because of the lag introduced by the visual feature).  
  
 ![alt text](https://github.com/sshersh/SudokuSolver/blob/master/sudoku1.gif)
 
 Notice how the solver guesses squares in a nonlinear order but backtracks fewer times. 
 
-There are plenty of faster and more advanced algorithms out there. Feel free to fork this repo and implement one yourself!
+There are plenty of faster and more advanced algorithms for constraint satisfaction problems out there. See [this paper on Dancing Links](https://www.diva-portal.org/smash/record.jsf?pid=diva2%3A770655&dswid=-4630) and [this paper on Douglas-Ratchford](https://arxiv.org/abs/1305.2657). Feel free to fork this repo and implement one yourself!
