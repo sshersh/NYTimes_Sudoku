@@ -31,3 +31,10 @@ sudoku('hard', headLess=True, strategy=2)
 
 ## Strategies
 
+### Strategy \#1
+
+![alt text](https://github.com/sshersh/SudokuSolver/blob/master/sudoku1.gif)
+
+### Strategy \#2
+
+![alt text](https://github.com/sshersh/SudokuSolver/blob/master/sudoku2.gif)
